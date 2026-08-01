@@ -1,0 +1,9 @@
+{
+  "phn": {
+    "type": "stdio",
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/phn-mcp",
+    "env": {
+      "PHN_AGENT_CLIENT": "Claude Code"
+    }
+  }
+}

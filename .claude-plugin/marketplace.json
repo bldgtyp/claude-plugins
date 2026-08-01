@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bldgtyp",
+  "description": "BLDGTYP tools for Passive House project work",
+  "owner": {
+    "name": "BLDGTYP, LLC",
+    "url": "https://bldgtyp.com"
+  },
+  "plugins": [
+    {
+      "name": "bldgtyp",
+      "source": "./plugins/bldgtyp",
+      "description": "PH-Navigator project access and workflow guidance",
+      "version": "0.1.0",
+      "author": {
+        "name": "BLDGTYP, LLC"
+      },
+      "category": "productivity",
+      "homepage": "https://github.com/bldgtyp/claude-plugins"
+    }
+  ]
+}

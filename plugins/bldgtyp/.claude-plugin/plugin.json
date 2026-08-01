@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "bldgtyp",
+  "displayName": "BLDGTYP",
+  "version": "0.1.0",
+  "description": "PH-Navigator project access and workflow guidance",
+  "author": {
+    "name": "BLDGTYP, LLC",
+    "url": "https://bldgtyp.com"
+  },
+  "homepage": "https://github.com/bldgtyp/claude-plugins",
+  "repository": "https://github.com/bldgtyp/claude-plugins",
+  "license": "MIT",
+  "keywords": ["passive-house", "ph-navigator", "mcp"]
+}

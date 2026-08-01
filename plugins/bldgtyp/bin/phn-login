@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+"""Authorize this machine for PH-Navigator without copying a token."""
+
+from pathlib import Path
+import sys
+
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PLUGIN_ROOT / "lib"))
+
+from phn_agent import login_main  # noqa: E402
+
+
+if __name__ == "__main__":
+    login_main()

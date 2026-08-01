@@ -1,0 +1,56 @@
+{
+  "api_url": "https://api.ph-nav.com",
+  "web_url": "https://www.ph-nav.com",
+  "mcp_path": "/mcp",
+  "credentials_path": "~/.config/phn/credentials.json",
+  "scopes": [
+    "project:read",
+    "project:write",
+    "asset:read",
+    "asset:write"
+  ],
+  "device": {
+    "start_path": "/api/v1/agent-tokens/device",
+    "poll_path": "/api/v1/agent-tokens/device/poll",
+    "pending_statuses": ["authorization_pending", "slow_down"],
+    "terminal_statuses": {
+      "approved": "approved",
+      "denied": "denied",
+      "expired": "expired"
+    },
+    "credential_fields": {
+      "api_url": "phn_api",
+      "token": "token",
+      "label": "label",
+      "issued": "issued"
+    }
+  },
+  "required_tools": [
+    "apply_aperture_command",
+    "apply_envelope_command",
+    "delete_project",
+    "diff_versions",
+    "discard_draft",
+    "get_document",
+    "get_project",
+    "get_table",
+    "hard_delete_project",
+    "list_projects",
+    "list_status_items",
+    "list_versions",
+    "preview_replace_table",
+    "query_unfinished_envelope_work",
+    "replace_table",
+    "report_missing_envelope_evidence",
+    "restore_project",
+    "save_draft",
+    "save_draft_as"
+  ],
+  "recoverability": ["fatal", "forbidden", "reauthenticate", "refresh", "retry"],
+  "contract_fragments": [
+    "Project-document writes land in the issuing editor's draft",
+    "For `replace_table`, use `draft_etag` after a draft exists.",
+    "`save_draft_as` to create an unlocked copy",
+    "inaccessible project returns `project_not_found` / `refresh`, not `forbidden`"
+  ]
+}
