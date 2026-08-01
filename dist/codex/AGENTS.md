@@ -22,7 +22,7 @@ The `phn` MCP bridge reads `~/.config/phn/credentials.json`. Missing, expired,
 or revoked credentials trigger browser device authorization automatically. The
 only human action is approving or denying the exact request in PH-Navigator.
 Never request, print, paste, or store the bearer token in a project folder.
-Use the `phn-login` device flow when the user explicitly asks to replace or refresh the
+Use the installed `__BLDGTYP_PHN_LOGIN_COMMAND__` device flow when the user explicitly asks to replace or refresh the
 machine credential.
 
 ## Choose focused reads

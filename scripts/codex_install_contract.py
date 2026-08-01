@@ -1,0 +1,5 @@
+"""Shared constants for generated and installed Codex artifacts."""
+
+AGENTS_START = "<!-- BEGIN BLDGTYP PHN GENERATED SECTION -->"
+AGENTS_END = "<!-- END BLDGTYP PHN GENERATED SECTION -->"
+LOGIN_COMMAND_PLACEHOLDER = "__BLDGTYP_PHN_LOGIN_COMMAND__"

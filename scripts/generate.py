@@ -8,6 +8,12 @@ import json
 import sys
 from pathlib import Path
 
+from codex_install_contract import (
+    AGENTS_END,
+    AGENTS_START,
+    LOGIN_COMMAND_PLACEHOLDER,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_SOURCE = ROOT / "source" / "phn-workflow.md"
 FOLDER_SOURCE = ROOT / "source" / "project-folder.md"
@@ -27,7 +33,10 @@ def _outputs() -> dict[Path, str]:
         workflow_source.format(**shared, login_command="`/bldgtyp:phn-login`") + "\n"
     )
     codex_workflow = (
-        workflow_source.format(**shared, login_command="the `phn-login` device flow")
+        workflow_source.format(
+            **shared,
+            login_command=f"the installed `{LOGIN_COMMAND_PLACEHOLDER}` device flow",
+        )
         + "\n"
     )
     folder = FOLDER_SOURCE.read_text(encoding="utf-8")
@@ -60,9 +69,7 @@ def _outputs() -> dict[Path, str]:
             f"{claude_workflow}"
         ),
         ROOT / "dist" / "codex" / "AGENTS.md": (
-            "<!-- BEGIN BLDGTYP PHN GENERATED SECTION -->\n"
-            f"{codex_workflow}"
-            "<!-- END BLDGTYP PHN GENERATED SECTION -->\n"
+            f"{AGENTS_START}\n{codex_workflow}{AGENTS_END}\n"
         ),
         ROOT / "templates" / "project-folder" / ".phn.json": marker,
         ROOT / "templates" / "project-folder" / "CLAUDE.md": claude_folder,

@@ -1,10 +1,13 @@
 PYTHON ?= python3
 MCP_CONTRACT ?= contract/phn-mcp.md
 
-.PHONY: generate test check
+.PHONY: generate install-codex test check
 
 generate:
 	$(PYTHON) scripts/generate.py
+
+install-codex:
+	$(PYTHON) scripts/install_codex.py
 
 test:
 	$(PYTHON) -m unittest discover -s tests

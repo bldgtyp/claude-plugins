@@ -81,3 +81,19 @@ claude --plugin-dir ./plugins/bldgtyp
 The MCP bridge uses only the Python standard library. PH-Navigator's server is
 stateless Streamable HTTP; the bridge translates newline-delimited stdio
 JSON-RPC without adding a package-install or proxy dependency.
+
+## Install for Codex
+
+Requires Codex CLI and Python 3.11 or newer. From this checkout:
+
+```sh
+make install-codex
+codex mcp get phn
+```
+
+The idempotent installer copies the same credential-aware bridge to
+`~/.local/share/bldgtyp/phn-agent`, adds a managed `mcp_servers.phn` section to
+`~/.codex/config.toml`, and adds the generated workflow section to
+`~/.codex/AGENTS.md`. Existing content and file permissions are preserved; an
+unmanaged server already named `phn` is rejected instead of overwritten.
+Restart Codex after installing or updating.
