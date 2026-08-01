@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import stat
+import os
 import shutil
+import stat
 import sys
 import tempfile
 import tomllib
@@ -52,8 +53,8 @@ class CodexInstallTests(unittest.TestCase):
             fallback_release = releases / "1111111111111111"
             shutil.copytree(first[2].parents[1], older_release)
             shutil.copytree(first[2].parents[1], fallback_release)
-            older_release.touch()
-            fallback_release.touch()
+            os.utime(older_release, ns=(1, 1))
+            os.utime(fallback_release, ns=(2, 2))
             second = install(codex_home=codex_home, data_home=data_home)
 
             self.assertEqual(first, second)
