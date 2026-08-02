@@ -1,7 +1,10 @@
 PYTHON ?= python3
 MCP_CONTRACT ?= contract/phn-mcp.md
 
-.PHONY: generate install-codex test check
+.PHONY: configure-claude generate install-codex test check
+
+configure-claude:
+	$(PYTHON) scripts/configure_claude.py
 
 generate:
 	$(PYTHON) scripts/generate.py

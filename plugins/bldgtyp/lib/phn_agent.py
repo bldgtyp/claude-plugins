@@ -17,7 +17,7 @@ import urllib.parse
 import webbrowser
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TextIO, cast
 
@@ -28,7 +28,7 @@ DEFAULT_SCOPES = tuple(cast(list[str], CONFIG["scopes"]))
 DEVICE_CONFIG = cast(dict[str, object], CONFIG["device"])
 CREDENTIAL_FIELDS = cast(dict[str, str], DEVICE_CONFIG["credential_fields"])
 TERMINAL_STATUSES = cast(dict[str, str], DEVICE_CONFIG["terminal_statuses"])
-USER_AGENT = "bldgtyp-phn-agent/0.1.0"
+USER_AGENT = "bldgtyp-phn-agent/0.1.1"
 
 
 class PhnAgentError(RuntimeError):
@@ -222,7 +222,7 @@ def write_credentials(path: Path, *, api_url: str, token: str, label: str) -> No
         CREDENTIAL_FIELDS["api_url"]: _validated_url(api_url),
         CREDENTIAL_FIELDS["token"]: token,
         CREDENTIAL_FIELDS["label"]: label,
-        CREDENTIAL_FIELDS["issued"]: datetime.now(UTC).isoformat(),
+        CREDENTIAL_FIELDS["issued"]: datetime.now(timezone.utc).isoformat(),
     }
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", dir=path.parent, text=True

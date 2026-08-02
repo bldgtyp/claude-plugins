@@ -6,9 +6,11 @@ project-resolution, read, draft-write, and error-recovery workflow.
 
 ## Install for Claude Code
 
-Requires Claude Code 2.1.203 or newer and Python 3.11 or newer.
+Requires Claude Code 2.1.203 or newer and Python 3.9 or newer. From this
+checkout, configure Claude's MCP startup window, then install the plugin:
 
 ```sh
+make configure-claude
 claude plugin marketplace add bldgtyp/claude-plugins --scope user
 claude plugin install bldgtyp@bldgtyp --scope user
 ```
@@ -26,6 +28,12 @@ rejects an expired/revoked token, it opens the
 PH-Navigator device-approval page and writes the replacement credential with
 mode `0600`. It never places the token in plugin config, command arguments, or
 the working project folder.
+
+`make configure-claude` idempotently sets `MCP_TIMEOUT` to at least 660,000 ms
+in `~/.claude/settings.json`, preserving unrelated settings and file mode.
+Claude Code otherwise stops a starting MCP server after 30 seconds, which is
+shorter than PH-Navigator's 10-minute device-approval grant. The timeout is a
+one-time machine setting, not per-session setup.
 
 ## Project markers
 
