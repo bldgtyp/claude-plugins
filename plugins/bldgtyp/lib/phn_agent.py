@@ -28,7 +28,7 @@ DEFAULT_SCOPES = tuple(cast(list[str], CONFIG["scopes"]))
 DEVICE_CONFIG = cast(dict[str, object], CONFIG["device"])
 CREDENTIAL_FIELDS = cast(dict[str, str], DEVICE_CONFIG["credential_fields"])
 TERMINAL_STATUSES = cast(dict[str, str], DEVICE_CONFIG["terminal_statuses"])
-USER_AGENT = "bldgtyp-phn-agent/0.1.1"
+USER_AGENT = "bldgtyp-phn-agent/0.1.2"
 
 
 class PhnAgentError(RuntimeError):
@@ -67,8 +67,10 @@ class PersistentHttpTransport:
         if connections is None:
             connections = {}
             self._local.connections = connections
+        # Quoted: cast() evaluates its type at runtime, and `int | None` needs 3.10.
         return cast(
-            dict[tuple[str, str, int | None], http.client.HTTPConnection], connections
+            "dict[tuple[str, str, int | None], http.client.HTTPConnection]",
+            connections,
         )
 
     def _connection(

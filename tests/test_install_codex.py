@@ -5,10 +5,16 @@ import shutil
 import stat
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+if sys.version_info < (3, 11):
+    # The Codex installer needs tomllib (README: Python 3.11 or newer); only the
+    # Claude plugin bridge supports the 3.9 floor.
+    raise unittest.SkipTest("Codex installer requires Python 3.11 or newer")
+
+import tomllib  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
