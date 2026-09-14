@@ -205,6 +205,113 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(connection.request_count, 1)
         discard.assert_called_once()
 
+    def test_persistent_transport_retries_once_on_stale_reused_socket(self) -> None:
+        import http.client
+
+        class Response:
+            status = 200
+
+            def getheaders(self) -> list[tuple[str, str]]:
+                return []
+
+            def read(self) -> bytes:
+                return b"{}"
+
+        class StaleConnection:
+            def __init__(self) -> None:
+                self.request_count = 0
+
+            def request(self, *_args: object, **_kwargs: object) -> None:
+                self.request_count += 1
+
+            def getresponse(self) -> Response:
+                raise http.client.RemoteDisconnected(
+                    "Remote end closed connection without response"
+                )
+
+            def close(self) -> None:
+                pass
+
+        class FreshConnection(StaleConnection):
+            def getresponse(self) -> Response:
+                return Response()
+
+        transport = PersistentHttpTransport()
+        stale = StaleConnection()
+        fresh = FreshConnection()
+        # Seed the pool so the first attempt counts as a reused socket.
+        key = ("https", "api.example.test", None)
+        transport._local.connections = {key: stale}
+        transport._local.last_used = {key: __import__("time").monotonic()}
+        with patch.object(transport, "_connection", side_effect=[stale, fresh]):
+            response = transport.request(
+                "https://api.example.test/mcp",
+                payload={"jsonrpc": "2.0"},
+                headers={"Authorization": "Bearer test-token"},
+                timeout=1,
+            )
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(stale.request_count, 1)
+        self.assertEqual(fresh.request_count, 1)
+
+    def test_persistent_transport_does_not_retry_remote_disconnect_on_fresh_socket(
+        self,
+    ) -> None:
+        import http.client
+
+        class Connection:
+            def __init__(self) -> None:
+                self.request_count = 0
+
+            def request(self, *_args: object, **_kwargs: object) -> None:
+                self.request_count += 1
+
+            def getresponse(self) -> object:
+                raise http.client.RemoteDisconnected(
+                    "Remote end closed connection without response"
+                )
+
+        transport = PersistentHttpTransport()
+        connection = Connection()
+        with (
+            patch.object(transport, "_connection", return_value=connection),
+            patch.object(transport, "_discard"),
+            self.assertRaisesRegex(PhnAgentError, "Could not reach"),
+        ):
+            transport.request(
+                "https://api.example.test/mcp",
+                payload={"jsonrpc": "2.0"},
+                headers={},
+                timeout=1,
+            )
+
+        self.assertEqual(connection.request_count, 1)
+
+    def test_persistent_transport_reopens_idle_pooled_connection(self) -> None:
+        import time
+        import urllib.parse
+
+        class OldConnection:
+            closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        transport = PersistentHttpTransport()
+        parsed = urllib.parse.urlsplit("https://api.example.test/mcp")
+        key = ("https", "api.example.test", None)
+        old = OldConnection()
+        transport._local.connections = {key: old}
+        transport._local.last_used = {
+            key: time.monotonic() - PersistentHttpTransport.MAX_IDLE_SECONDS - 1
+        }
+        connection = transport._connection(parsed, timeout=1)
+
+        self.assertTrue(old.closed)
+        self.assertIsNot(connection, old)
+        self.assertIs(transport._connections()[key], connection)
+
     def test_sse_response_emits_each_jsonrpc_message(self) -> None:
         response = HttpResponse(
             200,
