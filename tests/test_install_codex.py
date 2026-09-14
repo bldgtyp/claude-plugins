@@ -91,6 +91,51 @@ class CodexInstallTests(unittest.TestCase):
             self.assertFalse(older_release.exists())
             self.assertTrue(fallback_release.exists())
 
+    def test_install_keeps_tables_another_tool_wrote_inside_managed_section(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            codex_home = root / "codex"
+            codex_home.mkdir()
+            config = codex_home / "config.toml"
+            config.write_text(
+                f"{CONFIG_START}\n"
+                "[mcp_servers.phn]\n"
+                'command = "/old/releases/0000000000000000/bin/phn-mcp"\n'
+                "\n"
+                "[mcp_servers.phn.env]\n"
+                'PHN_AGENT_CLIENT = "Codex"\n'
+                "\n"
+                "[mcp_servers.node_repl]\n"
+                'command = "node_repl"\n'
+                "\n"
+                "[mcp_servers.node_repl.env]\n"
+                'CODEX_HOME = "/codex"\n'
+                f"{CONFIG_END}\n"
+                "\n"
+                "[notice]\n"
+                "hide_full_access_warning = true\n",
+                encoding="utf-8",
+            )
+
+            command = install(codex_home=codex_home, data_home=root / "data")[2]
+            first_config = config.read_text(encoding="utf-8")
+            install(codex_home=codex_home, data_home=root / "data")
+
+            self.assertEqual(config.read_text(encoding="utf-8"), first_config)
+            parsed = tomllib.loads(first_config)
+            self.assertEqual(parsed["mcp_servers"]["phn"]["command"], str(command))
+            self.assertEqual(
+                parsed["mcp_servers"]["node_repl"],
+                {"command": "node_repl", "env": {"CODEX_HOME": "/codex"}},
+            )
+            self.assertTrue(parsed["notice"]["hide_full_access_warning"])
+            managed = first_config[
+                first_config.index(CONFIG_START) : first_config.index(CONFIG_END)
+            ]
+            self.assertNotIn("node_repl", managed)
+
     def test_install_refuses_unmanaged_phn_server(self) -> None:
         variants = [
             '[mcp_servers.phn]\ncommand = "custom"\n',

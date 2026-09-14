@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import tempfile
@@ -64,6 +65,53 @@ def _without_managed_section(text: str, *, start: str, end: str) -> str:
     if start not in text and end not in text:
         return text
     return _replace_managed_section(text, "", start=start, end=end)
+
+
+TOML_TABLE_HEADER = re.compile(r"^\s*\[\[?([^\[\]]+)\]\]?\s*(?:#.*)?$")
+
+
+def _is_phn_table(key: str) -> bool:
+    parts = [part.strip().strip("\"'") for part in key.split(".")]
+    return parts[:2] == ["mcp_servers", "phn"]
+
+
+def _relocate_foreign_config_tables(text: str) -> str:
+    """Move tables another tool wrote inside the managed block to just after it.
+
+    Codex's own config writer can append tables such as [mcp_servers.node_repl]
+    between the markers, and replacing the block would delete them.
+    """
+    if text.count(CONFIG_START) != 1 or text.count(CONFIG_END) != 1:
+        return text
+    body_start = text.index(CONFIG_START) + len(CONFIG_START)
+    body_end = text.index(CONFIG_END)
+    if body_end < body_start:
+        return text
+    owned: list[str] = []
+    foreign: list[str] = []
+    target = owned
+    for line in text[body_start:body_end].splitlines(keepends=True):
+        if header := TOML_TABLE_HEADER.match(line):
+            target = owned if _is_phn_table(header.group(1)) else foreign
+        target.append(line)
+    if not foreign:
+        return text
+    rest = text[body_end + len(CONFIG_END) :]
+    if not rest.startswith("\n"):
+        rest = f"\n{rest}"
+    return (
+        f"{text[:body_start]}{''.join(owned)}{CONFIG_END}\n\n"
+        f"{''.join(foreign).rstrip()}{rest}"
+    )
+
+
+def _without_phn_server(config: dict[str, object]) -> dict[str, object]:
+    servers = config.get("mcp_servers")
+    if not isinstance(servers, dict):
+        return config
+    remaining = {name: value for name, value in servers.items() if name != "phn"}
+    others = {key: value for key, value in config.items() if key != "mcp_servers"}
+    return {**others, "mcp_servers": remaining} if remaining else others
 
 
 def _atomic_write(path: Path, content: str, *, mode: int | None = None) -> None:
@@ -179,6 +227,11 @@ def install(*, codex_home: Path, data_home: Path) -> tuple[Path, Path, Path]:
     config_text = (
         config_path.read_text(encoding="utf-8") if config_path.exists() else ""
     )
+    try:
+        existing_config: dict[str, object] | None = tomllib.loads(config_text)
+    except tomllib.TOMLDecodeError:
+        existing_config = None  # a corrupt managed block is repaired below
+    config_text = _relocate_foreign_config_tables(config_text)
     previous_release = _configured_release(config_text, release.parent)
     without_managed = _without_managed_section(
         config_text, start=CONFIG_START, end=CONFIG_END
@@ -201,11 +254,17 @@ def install(*, codex_home: Path, data_home: Path) -> tuple[Path, Path, Path]:
         end=CONFIG_END,
     )
     try:
-        tomllib.loads(updated_config)
+        updated_parsed = tomllib.loads(updated_config)
     except tomllib.TOMLDecodeError as exc:
         raise InstallError(
             "Generated Codex MCP configuration is invalid TOML."
         ) from exc
+    if existing_config is not None and _without_phn_server(
+        updated_parsed
+    ) != _without_phn_server(existing_config):
+        raise InstallError(
+            f"Refusing to change Codex config outside [mcp_servers.phn] in {config_path}."
+        )
 
     agents_section = AGENTS_SOURCE.read_text(encoding="utf-8")
     if agents_section.count(LOGIN_COMMAND_PLACEHOLDER) != 1:
