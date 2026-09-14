@@ -62,6 +62,25 @@ Client projects are live production data.
   unless the user explicitly requests the exact operation. Treat
   `hard_delete_project` as off-limits during autonomous work.
 
+## Write values in SI units
+
+Document storage is canonical SI everywhere; the browser's IP display is a
+non-persistent formatting layer, and the MCP surface reads and writes the
+stored SI values directly.
+
+- Fields carrying a `config.units` block store their `si_unit`: capacities kW,
+  volumes liters, airflow m3/h, water flow l/min, temperatures C, energy kWh,
+  heat-loss rates W/K, lengths m or mm.
+- Plain number fields with no `config.units` store exactly the unit named in
+  their label (for example `fan_speed_cfm` CFM, `nominal_tons` tons, watts,
+  volts, Btu/h fields).
+- Field keys are not reliable unit hints. Known traps:
+  `heat_pumps_indoor_equip.cooling_btuh` and `.heating_btuh_47f` store kW
+  despite their names (only `heating_btuh_17f` is genuinely Btu/h), and
+  `pumps.flow_gpm` stores l/min. When a key and its units block disagree,
+  the units block wins; when there is no units block, trust the display
+  label, and spot-check one value in the browser UI after writing.
+
 ## Recover from structured errors
 
 MCP failures expose a JSON `ToolError` string with `code`, `message`,
