@@ -57,6 +57,11 @@ class HttpResponse:
 class PersistentHttpTransport:
     """Keep one reusable HTTP connection per bridge worker thread."""
 
+    # Cloudflare/Render close keep-alive sockets that sit idle between
+    # tool calls; sending into one fails with RemoteDisconnected or a
+    # broken pipe. Reopen instead of reusing anything older than this.
+    MAX_IDLE_SECONDS = 10.0
+
     def __init__(self) -> None:
         self._local = threading.local()
 
@@ -73,23 +78,47 @@ class PersistentHttpTransport:
             connections,
         )
 
-    def _connection(
-        self, parsed: urllib.parse.SplitResult, timeout: float
-    ) -> http.client.HTTPConnection:
+    def _last_used(self) -> dict[tuple[str, str, int | None], float]:
+        last_used = getattr(self._local, "last_used", None)
+        if last_used is None:
+            last_used = {}
+            self._local.last_used = last_used
+        return cast("dict[tuple[str, str, int | None], float]", last_used)
+
+    def _pool_key(
+        self, parsed: urllib.parse.SplitResult
+    ) -> tuple[str, str, int | None]:
         hostname = parsed.hostname
         if hostname is None:
             raise PhnAgentError("PH-Navigator MCP URL has no host.")
-        key = (parsed.scheme, hostname, parsed.port)
+        return (parsed.scheme, hostname, parsed.port)
+
+    def _has_pooled_connection(self, parsed: urllib.parse.SplitResult) -> bool:
+        return self._pool_key(parsed) in self._connections()
+
+    def _connection(
+        self, parsed: urllib.parse.SplitResult, timeout: float
+    ) -> http.client.HTTPConnection:
+        key = self._pool_key(parsed)
         connections = self._connections()
         connection = connections.get(key)
+        now = time.monotonic()
+        if (
+            connection is not None
+            and now - self._last_used().get(key, now) > self.MAX_IDLE_SECONDS
+        ):
+            connection.close()
+            connections.pop(key, None)
+            connection = None
         if connection is None:
             connection_class = (
                 http.client.HTTPSConnection
                 if parsed.scheme == "https"
                 else http.client.HTTPConnection
             )
-            connection = connection_class(hostname, parsed.port, timeout=timeout)
+            connection = connection_class(parsed.hostname, parsed.port, timeout=timeout)
             connections[key] = connection
+        self._last_used()[key] = now
         return connection
 
     def _discard(self, parsed: urllib.parse.SplitResult) -> None:
@@ -124,20 +153,7 @@ class PersistentHttpTransport:
             path = urllib.parse.urlunsplit(
                 ("", "", parsed.path or "/", parsed.query, "")
             )
-            connection = self._connection(parsed, timeout)
-            try:
-                connection.request("POST", path, body=body, headers=request_headers)
-                response = connection.getresponse()
-                result = HttpResponse(
-                    status=response.status,
-                    headers={
-                        key.lower(): value for key, value in response.getheaders()
-                    },
-                    body=response.read(),
-                )
-            except (OSError, http.client.HTTPException) as exc:
-                self._discard(parsed)
-                raise PhnAgentError(f"Could not reach PH-Navigator: {exc}") from exc
+            result = self._exchange(parsed, path, body, request_headers, timeout)
             if result.status not in {307, 308}:
                 return result
             location = result.headers.get("location")
@@ -150,6 +166,48 @@ class PersistentHttpTransport:
                 )
             current_url = redirected_url
         raise PhnAgentError("PH-Navigator returned too many redirects.")
+
+    def _exchange(
+        self,
+        parsed: urllib.parse.SplitResult,
+        path: str,
+        body: bytes,
+        request_headers: Mapping[str, str],
+        timeout: float,
+    ) -> HttpResponse:
+        for attempt in (0, 1):
+            reused = self._has_pooled_connection(parsed)
+            connection = self._connection(parsed, timeout)
+            sent = False
+            try:
+                connection.request(
+                    "POST", path, body=body, headers=dict(request_headers)
+                )
+                sent = True
+                response = connection.getresponse()
+                return HttpResponse(
+                    status=response.status,
+                    headers={
+                        key.lower(): value for key, value in response.getheaders()
+                    },
+                    body=response.read(),
+                )
+            except (OSError, http.client.HTTPException) as exc:
+                self._discard(parsed)
+                # A pooled socket the server closed while idle fails before
+                # the request is accepted: either the send itself errors, or
+                # getresponse() hits RemoteDisconnected with zero response
+                # bytes. The server never processed the request, so one
+                # retry on a fresh connection is safe. Any failure on a
+                # fresh connection — or after response bytes started — stays
+                # fatal: never replay an indeterminate POST.
+                stale_reused_socket = reused and (
+                    not sent or isinstance(exc, http.client.RemoteDisconnected)
+                )
+                if attempt == 0 and stale_reused_socket:
+                    continue
+                raise PhnAgentError(f"Could not reach PH-Navigator: {exc}") from exc
+        raise PhnAgentError("Could not reach PH-Navigator: retries exhausted.")
 
 
 MCP_HTTP_TRANSPORT = PersistentHttpTransport()
